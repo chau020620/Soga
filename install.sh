@@ -1,4 +1,5 @@
 #!/bin/bash
+
 red='\033[0;31m'
 green='\033[0;32m'
 yellow='\033[0;33m'
@@ -6,10 +7,10 @@ plain='\033[0m'
 
 cur_dir=$(pwd)
 
-# kiểm tra gốc
-[[ $EUID -ne 0 ]] && echo -e "  lỗi：Tập lệnh này phải được chạy với tư cách người dùng gốc！\n" && exit 1
+# check root
+[[ $EUID -ne 0 ]] && echo -e "${red}错误：${plain} 必须使用root用户运行此脚本！\n" && exit 1
 
-# kiểm tra hệ điều hành
+# check os
 if [[ -f /etc/redhat-release ]]; then
     release="centos"
 elif cat /etc/issue | grep -Eqi "debian"; then
@@ -22,55 +23,82 @@ elif cat /etc/issue | grep -Eqi "centos|red hat|redhat"; then
     release="centos"
 elif cat /proc/version | grep -Eqi "debian"; then
     release="debian"
-elif cat /proc/version | grep -Eqi "armbian"; then
+elif cat /etc/issue | grep -Eqi "armbian"; then
     release="armbian"
 elif cat /proc/version | grep -Eqi "ubuntu"; then
     release="ubuntu"
 elif cat /proc/version | grep -Eqi "centos|red hat|redhat"; then
     release="centos"
 else
-    echo -e "  Phiên bản hệ thống không được phát hiện, vui lòng liên hệ với tác giả kịch bản！${plain}\n" && exit 1
+    echo -e "${red}未检测到系统版本，请联系脚本作者！${plain}\n" && exit 1
 fi
 
+arch=$(arch)
+
+if [[ $arch == "x86_64" || $arch == "x64" || $arch == "amd64" ]]; then
+  arch="amd64"
+elif [[ $arch == "aarch64" || $arch == "arm64" ]]; then
+  arch="arm64"
+else
+  arch="amd64"
+  echo -e "${red}检测架构失败，使用默认架构: ${arch}${plain}"
+fi
+
+echo "架构: ${arch}"
+
 if [ "$(getconf WORD_BIT)" != '32' ] && [ "$(getconf LONG_BIT)" != '64' ] ; then
-    echo "  Phần mềm này không hỗ trợ hệ thống 32-bit (x86), vui lòng sử dụng hệ thống 64-bit (x86_64), nếu phát hiện sai, vui lòng liên hệ với tác giả"
+    echo "本软件不支持 32 位系统(x86)，请使用 64 位系统(x86_64)，如果检测有误，请联系作者"
     exit 2
 fi
 
-os_version=""
+#os_version=""
+#
+## os version
+#if [[ -f /etc/os-release ]]; then
+#    os_version=$(awk -F'[= ."]' '/VERSION_ID/{print $3}' /etc/os-release)
+#fi
+#if [[ -z "$os_version" && -f /etc/lsb-release ]]; then
+#    os_version=$(awk -F'[= ."]+' '/DISTRIB_RELEASE/{print $2}' /etc/lsb-release)
+#fi
+#
+#if [[ x"${release}" == x"centos" ]]; then
+#    if [[ ${os_version} -le 6 ]]; then
+#        echo -e "${red}请使用 CentOS 7 或更高版本的系统！${plain}\n" && exit 1
+#    fi
+#elif [[ x"${release}" == x"ubuntu" ]]; then
+#    if [[ ${os_version} -lt 16 ]]; then
+#        echo -e "${red}请使用 Ubuntu 16 或更高版本的系统！${plain}\n" && exit 1
+#    fi
+#elif [[ x"${release}" == x"debian" ]]; then
+#    if [[ ${os_version} -lt 8 ]]; then
+#        echo -e "${red}请使用 Debian 8 或更高版本的系统！${plain}\n" && exit 1
+#    fi
+#fi
 
-# os version
-if [[ -f /etc/os-release ]]; then
-    os_version=$(awk -F'[= ."]' '/VERSION_ID/{print $3}' /etc/os-release)
-fi
-if [[ -z "$os_version" && -f /etc/lsb-release ]]; then
-    os_version=$(awk -F'[= ."]+' '/DISTRIB_RELEASE/{print $2}' /etc/lsb-release)
-fi
+function is_cmd_exist() {
+    local cmd="$1"
+    if [ -z "$cmd" ]; then
+        return 1
+    fi
 
-if [[ x"${release}" == x"centos" ]]; then
-    if [[ ${os_version} -le 6 ]]; then
-        echo -e "  Vui lòng sử dụng CentOS 7 trở lên！${plain}\n" && exit 1
+    which "$cmd" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        return 0
     fi
-elif [[ x"${release}" == x"ubuntu" ]]; then
-    if [[ ${os_version} -lt 16 ]]; then
-        echo -e "  Vui lòng sử dụng Ubuntu 16 trở lên！${plain}\n" && exit 1
-    fi
-elif [[ x"${release}" == x"debian" ]]; then
-    if [[ ${os_version} -lt 8 ]]; then
-        echo -e "  Vui lòng sử dụng Debian 8 trở lên！${plain}\n" && exit 1
-    fi
-fi
+
+	  return 2
+}
 
 install_base() {
     if [[ x"${release}" == x"centos" ]]; then
         yum install epel-release -y
-        yum install wget curl tar crontabs socat -y
+        yum install wget curl tar crontabs socat tzdata -y
     else
-        apt install wget curl tar cron socat -y
+        apt install wget curl tar cron socat tzdata -y
     fi
 }
 
-# 0: đang chạy, 1: không chạy, 2: chưa cài đặt
+# 0: running, 1: not running, 2: not installed
 check_status() {
     if [[ ! -f /etc/systemd/system/soga.service ]]; then
         return 2
@@ -85,6 +113,7 @@ check_status() {
 
 install_acme() {
     curl https://get.acme.sh | sh
+    /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
 }
 
 install_soga() {
@@ -94,24 +123,24 @@ install_soga() {
     fi
 
     if  [ $# == 0 ] ;then
-        last_version=$(curl -Ls "https://api.github.com/repos/enxier/crack-soga/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        if [[ ! -n "$last_version" ]]; then
-            echo -e "  Không phát hiện được phiên bản soga, có thể đã vượt quá giới hạn API Github, vui lòng thử lại sau hoặc chỉ định phiên bản soga để cài đặt theo cách thủ công${plain}"
-            exit 1
-        fi
-        echo -e "  soga phiên bản mới nhất được phát hiện：${last_version}，bắt đầu cài đặt"
-        wget -N --no-check-certificate -O /usr/local/soga.tar.gz https://github.com/enxier/crack-soga/releases/download/${last_version}/soga-cracked-linux64.tar.gz
+#        last_version=$(curl -Ls "https://api.github.com/repos/vaxilu/soga/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+#        if [[ ! -n "$last_version" ]]; then
+#            echo -e "${red}检测 soga 版本失败，可能是超出 Github API 限制，请稍后再试，或手动指定 soga 版本安装${plain}"
+#            exit 1
+#        fi
+        echo -e "开始安装 soga 最新版"
+        wget -N --no-check-certificate -O /usr/local/soga.tar.gz https://github.com/vaxilu/soga/releases/latest/download/soga-linux-${arch}.tar.gz
         if [[ $? -ne 0 ]]; then
-            echo -e "  Không thể tải xuống soga, vui lòng đảm bảo máy chủ của bạn có thể tải xuống tệp Github${plain}"
+            echo -e "${red}下载 soga 失败，请确保你的服务器能够下载 Github 的文件${plain}"
             exit 1
         fi
     else
         last_version=$1
-        url="https://github.com/enxier/crack-soga/releases/download/${last_version}/soga-cracked-linux64.tar.gz"
-        echo -e "  bắt đầu cài đặt soga v$1"
+        url="https://github.com/vaxilu/soga/releases/download/${last_version}/soga-linux-${arch}.tar.gz"
+        echo -e "开始安装 soga v$1"
         wget -N --no-check-certificate -O /usr/local/soga.tar.gz ${url}
         if [[ $? -ne 0 ]]; then
-            echo -e "  Không tải xuống được soga v$1, hãy đảm bảo rằng phiên bản này tồn tại${plain}"
+            echo -e "${red}下载 soga v$1 失败，请确保此版本存在${plain}"
             exit 1
         fi
     fi
@@ -120,58 +149,77 @@ install_soga() {
     rm soga.tar.gz -f
     cd soga
     chmod +x soga
+    last_version="$(./soga -v)"
     mkdir /etc/soga/ -p
     rm /etc/systemd/system/soga.service -f
+    rm /etc/systemd/system/soga@.service -f
     cp -f soga.service /etc/systemd/system/
+    cp -f soga@.service /etc/systemd/system/
     systemctl daemon-reload
     systemctl stop soga
     systemctl enable soga
-    echo -e "  soga v${last_version}${plain} Quá trình cài đặt hoàn tất, nó đã được thiết lập để bắt đầu tự động"
+    echo -e "${green}soga v${last_version}${plain} 安装完成，已设置开机自启"
     if [[ ! -f /etc/soga/soga.conf ]]; then
         cp soga.conf /etc/soga/
         echo -e ""
-        echo -e "  Để cài đặt mới, vui lòng tham khảo hướng dẫn wiki trước: https://github.com/sprov065/soga/wiki, cấu hình nội dung cần thiết"
+        echo -e "全新安装，请先配置必要的内容"
     else
         systemctl start soga
         sleep 2
         check_status
         echo -e ""
         if [[ $? == 0 ]]; then
-            echo -e "  soga khởi động lại thành công${plain}"
+            echo -e "${green}soga 重启成功${plain}"
         else
-            echo -e "  soga có thể không khởi động được, vui lòng sử dụng soga log để kiểm tra thông tin nhật ký sau này, nếu không khởi động được, định dạng cấu hình có thể đã bị thay đổi${plain}"
+            echo -e "${red}soga 可能启动失败，请稍后使用 soga log 查看日志信息${plain}"
         fi
     fi
 
     if [[ ! -f /etc/soga/blockList ]]; then
         cp blockList /etc/soga/
     fi
+    if [[ ! -f /etc/soga/whiteList ]]; then
+        cp whiteList /etc/soga/
+    fi
     if [[ ! -f /etc/soga/dns.yml ]]; then
         cp dns.yml /etc/soga/
     fi
-    curl -o /usr/bin/soga -Ls https://raw.githubusercontent.com/DauDau432/crack-soga/main/soga.sh
+    if [[ ! -f /etc/soga/routes.toml ]]; then
+        cp routes.toml /etc/soga/
+    fi
+    curl -o /usr/bin/soga -Ls https://raw.githubusercontent.com/vaxilu/soga/master/soga.sh
     chmod +x /usr/bin/soga
-    clear
-    echo ""
-    echo "  Cách sử dụng tập lệnh quản lý soga:"
-    echo "--------------------[Đậu Đậu việt hóa]--------------------" 
-    echo "  soga              - Hiển thị menu quản lý (nhiều chức năng hơn)"
-    echo "  soga start        - bắt đầu soga"
-    echo "  soga stop         - dừng soga"
-    echo "  soga restart      - khởi động lại soga"
-    echo "  soga status       - Kiểm tra trạng thái soga"
-    echo "  soga enable       - Đặt soga để bắt đầu tự động "
-    echo "  soga disable      - Hủy tự động bắt đầu soga "
-    echo "  soga log          - Xem nhật ký soga "
-    echo "  soga update       - cập nhật soga "
-    echo "  soga update x.x.x - cập nhật phiên bản chỉ định soga "
-    echo "  soga install      - cài đặt soga "
-    echo "  soga uninstall    - gỡ cài đặt soga "
-    echo "  soga version      - Kiểm tra phiên bản soga "
-    echo "----------------------------------------------------------"   
+    curl -o /usr/bin/soga-tool -Ls https://raw.githubusercontent.com/vaxilu/soga/master/soga-tool-${arch}
+    chmod +x /usr/bin/soga-tool
+    echo -e ""
+    echo "soga 管理脚本使用方法: "
+    echo "------------------------------------------"
+    echo "soga                    - 显示管理菜单 (功能更多)"
+    echo "soga start              - 启动 soga"
+    echo "soga stop               - 停止 soga"
+    echo "soga restart            - 重启 soga"
+    echo "soga status             - 查看 soga 状态"
+    echo "soga enable             - 设置 soga 开机自启"
+    echo "soga disable            - 取消 soga 开机自启"
+    echo "soga log                - 查看 soga 日志"
+    echo "soga log n              - 查看 soga 最后 n 行日志"
+    echo "soga update             - 更新 soga"
+    echo "soga update x.x.x       - 更新 soga 指定版本"
+    echo "soga config             - 显示配置文件内容"
+    echo "soga config xx=xx yy=yy - 自动设置配置文件"
+    echo "soga install            - 安装 soga"
+    echo "soga uninstall          - 卸载 soga"
+    echo "soga version            - 查看 soga 版本"
+    echo "------------------------------------------"
 }
 
-echo -e "  bắt đầu cài đặt${plain}"
+is_cmd_exist "systemctl"
+if [[ $? != 0 ]]; then
+    echo "systemctl 命令不存在，请使用较新版本的系统，例如 Ubuntu 18+、Debian 9+"
+    exit 1
+fi
+
+echo -e "${green}开始安装${plain}"
 install_base
 install_acme
 install_soga $1
