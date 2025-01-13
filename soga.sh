@@ -164,7 +164,7 @@ start() {
         sleep 2
         check_status
         if [[ $? == 0 ]]; then
-            echo -e "${green}soga chạy thành công, sử dụng soga log để xem nhật ký${plain}"
+            echo -e "${green}soga đang chạy, sử dụng soga log để xem nhật ký${plain}"
         else
             echo -e "${red}soga không thể chạy, sử dụng soga log để xem nhật ký${plain}"
         fi
@@ -208,9 +208,9 @@ restart() {
 enable() {
     systemctl enable soga
     if [[ $? == 0 ]]; then
-        echo -e "${green}soga thiết lập tự khởi động thành công${plain}"
+        echo -e "${green}Tự khởi động soga thành công${plain}"
     else
-        echo -e "${red}soga thiết lập không tự khởi động${plain}"
+        echo -e "${red}Không tự khởi động soga${plain}"
     fi
 
     if [[ $# == 0 ]]; then
@@ -221,9 +221,9 @@ enable() {
 disable() {
     systemctl disable soga
     if [[ $? == 0 ]]; then
-        echo -e "${green}soga Đã hủy khởi động${plain}"
+        echo -e "${green}Đã hủy khởi động${plain}"
     else
-        echo -e "${red}soga Không thể hủy khởi động${plain}"
+        echo -e "${red}Không thể hủy khởi động${plain}"
     fi
 
     if [[ $# == 0 ]]; then
@@ -323,9 +323,9 @@ show_status() {
 show_enable_status() {
     check_enabled
     if [[ $? == 0 ]]; then
-        echo -e "Có tự khởi động soga không: ${green}Có${plain}"
+        echo -e "Tự khởi động soga: ${green}Mở${plain}"
     else
-        echo -e "Có tự khởi động soga: ${red}Không${plain}"
+        echo -e "Tự khởi động soga: ${red}Không${plain}"
     fi
 }
 
@@ -360,7 +360,7 @@ show_usage() {
 
 show_menu() {
     echo -e "
-  ${green}soga Lệnh quản lý soga，${plain}${red}không áp dụng cho docker${plain}
+  ${green}Lệnh quản lý soga，${plain}${red}không áp dụng cho docker${plain}
 
   ${green}0.${plain} Thoát
 ————————————————
@@ -373,8 +373,8 @@ show_menu() {
   ${green}6.${plain} Khởi động lại soga
   ${green}7.${plain} Xem nhật ký soga
 ————————————————
-  ${green}8.${plain} Thiết lập soga tự khởi động
-  ${green}9.${plain} Hủy thiết lập soga tự khởi động
+  ${green}8.${plain} Tự khởi động soga
+  ${green}9.${plain} Hủy tự Khởi động soga
 ————————————————
  ${green}10.${plain} Xem phiên bản soga
  "
